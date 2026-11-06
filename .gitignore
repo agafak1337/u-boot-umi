@@ -1,0 +1,6 @@
+build/
+*.img
+*.dtb
+*.bin
+payload/*.efi
+!payload/.gitkeep

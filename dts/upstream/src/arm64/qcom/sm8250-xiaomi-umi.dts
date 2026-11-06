@@ -1,0 +1,53 @@
+// SPDX-License-Identifier: BSD-3-Clause
+/*
+ * Xiaomi Mi 10 (umi, SM8250 "kona") - U-Boot control device tree.
+ *
+ * This is intentionally small: it reuses the Xiaomi Mi Pad 5 Pro (elish)
+ * board description from U-Boot's upstream Linux DT mirror. umi and elish
+ * are the same SM8250 + PM8150/PM8150B/PM8150L + PM8009 family; the SoC
+ * nodes U-Boot needs (UFS, USB2 gadget, RPMH regulators, TLMM, RPMPD)
+ * are the same. Only the identity and the panel geometry differ.
+ *
+ * The framebuffer is the splash XBL leaves in "Display Reserved"
+ * (0x9c000000, 0x2300000), the same region Mu-Silicium uses for umi.
+ *
+ * Do not add a /memory node: U-Boot gets the real memory map from SMEM
+ * when the internal DT has none (arch/arm/mach-snapdragon/dram.c).
+ */
+
+/dts-v1/;
+
+/* Keep the splash out of U-Boot's LMB allocations. */
+/memreserve/ 0x000000009c000000 0x0000000002300000;
+
+#include "sm8250-xiaomi-elish-common.dtsi"
+
+/ {
+	model = "Xiaomi Mi 10 (umi)";
+	compatible = "xiaomi,umi", "qcom,sm8250";
+	chassis-type = "handset";
+
+	/*
+	 * elish's board-id does not describe umi. The DT is appended to the
+	 * boot image, so ABL does not have to match it against a partition;
+	 * leave the SM8250 v2.1 msm-id inherited from elish in place.
+	 */
+	/delete-property/ qcom,board-id;
+};
+
+/* 6.67" 1080x2340 AMOLED; XBL already set the panel up. */
+&framebuffer {
+	width = <1080>;
+	height = <2340>;
+	stride = <(1080 * 4)>;
+	format = "a8r8g8b8";
+};
+
+/*
+ * elish marks the splash region no-map because Linux must not touch it.
+ * U-Boot writes the console there, so it has to stay mapped. The
+ * /memreserve/ above still keeps LMB away from it.
+ */
+&cont_splash_mem {
+	/delete-property/ no-map;
+};

@@ -1,0 +1,59 @@
+name: build-u-boot-umi
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      uboot_tag:
+        description: "U-Boot tag (default: v2027.01-rc1)"
+        required: false
+        default: "v2027.01-rc1"
+      payload_url:
+        description: "Optional URL of an EFI application (e.g. xnuloader.efi) to pack as the ramdisk"
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential bison flex libssl-dev libgnutls28-dev uuid-dev \
+            swig python3 python3-dev python3-setuptools python3-pyelftools \
+            gcc-aarch64-linux-gnu device-tree-compiler bc git gzip curl
+
+      - name: Build
+        env:
+          UBOOT_TAG: ${{ github.event.inputs.uboot_tag || 'v2027.01-rc1' }}
+          PAYLOAD_URL: ${{ github.event.inputs.payload_url }}
+        run: |
+          if [ -n "$PAYLOAD_URL" ]; then
+            mkdir -p build
+            curl -fL "$PAYLOAD_URL" -o build/payload.efi
+            export PAYLOAD=build/payload.efi
+          fi
+          bash scripts/build.sh
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: u-boot-umi
+          path: |
+            build/out/u-boot-umi.img
+            build/out/u-boot.bin
+            build/out/u-boot.dtb
+            build/out/.config
+            build/out/build-info.txt
+          if-no-files-found: error
+          include-hidden-files: true

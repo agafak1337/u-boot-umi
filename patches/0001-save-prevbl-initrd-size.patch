@@ -1,0 +1,40 @@
+From: u-boot-umi
+Subject: [PATCH] arm: snapdragon: save the previous BL initrd size too
+
+`bootefi <addr>` can only run a raw PE/COFF image when the image address
+and size are both known. ABL publishes the ramdisk as
+/chosen/linux,initrd-start and linux,initrd-end, but U-Boot only saves
+the start address. Save the size as well, so an EFI application packed
+as the Android ramdisk can be started with
+`bootefi ${prevbl_initrd_start_addr}:${prevbl_initrd_size}`.
+
+This is a local port patch (u-boot-umi), not an upstream submission.
+
+diff --git a/arch/arm/lib/save_prev_bl_data.c b/arch/arm/lib/save_prev_bl_data.c
+--- a/arch/arm/lib/save_prev_bl_data.c
++++ b/arch/arm/lib/save_prev_bl_data.c
+@@ -54,6 +54,6 @@ int save_prev_bl_data(void)
+ 	struct fdt_header *fdt_blob;
+ 	int node;
+-	u64 initrd_start_prop;
++	u64 initrd_start_prop, initrd_end_prop;
+ 
+ 	if (!is_addr_accessible((phys_addr_t)reg0))
+ 		return -ENODATA;
+@@ -90,5 +90,16 @@ int save_prev_bl_data(void)
+ 		}
+ 	}
+ 	env_set_addr("prevbl_initrd_start_addr", (void *)initrd_start_prop);
+ 
++	/*
++	 * The payload packed into the Android ramdisk is a raw PE/COFF
++	 * image, so bootefi needs its size as well as its address.
++	 */
++	initrd_end_prop = fdtdec_get_uint64(fdt_blob, node, "linux,initrd-end", 0);
++	if (!initrd_end_prop)
++		initrd_end_prop = fdtdec_get_uint(fdt_blob, node, "linux,initrd-end", 0);
++	if (initrd_end_prop > initrd_start_prop)
++		env_set_hex("prevbl_initrd_size",
++			    (ulong)(initrd_end_prop - initrd_start_prop));
++
+ 	return 0;
